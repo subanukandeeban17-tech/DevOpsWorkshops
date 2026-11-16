@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps Store - E-Commerce App</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #f4f6f9; color: #1e293b; }
+        header { background: #0f172a; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+        header h1 { font-size: 1.4rem; display: flex; align-items: center; gap: 0.5rem; }
+        .badge { background: #3b82f6; padding: 0.35rem 0.85rem; border-radius: 999px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+        @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.25rem; }
+        .card { background: white; border-radius: 10px; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between; }
+        .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .category { font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.05em; }
+        .card h3 { font-size: 1.05rem; margin: 0.3rem 0; }
+        .card p { font-size: 0.85rem; color: #475569; margin-bottom: 1rem; line-height: 1.4; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 0.85rem; }
+        .price { font-weight: 700; font-size: 1.1rem; color: #0f172a; }
+        button { background: #2563eb; color: white; border: none; padding: 0.5rem 0.9rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        button:hover { background: #1d4ed8; }
+        .cart-panel { background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); height: fit-content; }
+        .cart-panel h2 { font-size: 1.2rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        .remove-btn { background: #ef4444; padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-left: 0.5rem; }
+        .remove-btn:hover { background: #dc2626; }
+        .cart-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; margin: 1.25rem 0; }
+        .checkout-btn { width: 100%; background: #16a34a; padding: 0.75rem; font-size: 1rem; }
+        .checkout-btn:hover { background: #15803d; }
+        .checkout-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .toast { margin-top: 1rem; padding: 0.75rem; background: #dcfce7; color: #166534; border-radius: 6px; font-size: 0.85rem; display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚀 DevOps Gear Store</h1>
+        <div class="badge" id="cart-badge">Cart: 0 items</div>
+    </header>
+
+    <div class="container">
+        <div>
+            <div class="grid" id="product-grid"></div>
+        </div>
+        <div class="cart-panel">
+            <h2>🛒 Shopping Cart</h2>
+            <div id="cart-items"><p style="color:#64748b; font-size:0.9rem;">Your cart is empty.</p></div>
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="cart-total">$0.00</span>
+            </div>
+            <button class="checkout-btn" id="checkout-btn" onclick="checkout()" disabled>Checkout Now</button>
+            <div class="toast" id="toast"></div>
+        </div>
+    </div>
+
+    <script>
+        async function loadProducts() {
+            const res = await fetch('/api/products');
+            const products = await res.json();
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = products.map(p => `
+                <div class="card">
+                    <div>
+                        <div class="icon">${p.icon}</div>
+                        <div class="category">${p.category}</div>
+                        <h3>${p.name}</h3>
+                        <p>${p.description}</p>
+                    </div>
+                    <div class="card-footer">
+                        <span class="price">$${p.price.toFixed(2)}</span>
+                        <button onclick="addToCart(${p.id})">Add to Cart</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addToCart(id) {
+            const res = await fetch(`/api/cart/add/${id}`, { method: 'POST' });
+            renderCart(await res.json());
+        }
+
+        async function removeFromCart(id) {
+            const res = await fetch(`/api/cart/remove/${id}`, { method: 'DELETE' });
+            renderCart(await res.json());
+        }
+
+        async function loadCart() {
+            const res = await fetch('/api/cart');
+            renderCart(await res.json());
+        }
+
+        function renderCart(data) {
+            document.getElementById('cart-badge').innerText = `Cart: ${data.count} item${data.count === 1 ? '' : 's'}`;
+            document.getElementById('cart-total').innerText = `$${data.total.toFixed(2)}`;
+            const container = document.getElementById('cart-items');
+            const btn = document.getElementById('checkout-btn');
+
+            if (data.items.length === 0) {
+                container.innerHTML = '<p style="color:#64748b; font-size:0.9rem;">Your cart is empty.</p>';
+                btn.disabled = true;
+                return;
+            }
+
+            btn.disabled = false;
+            container.innerHTML = data.items.map(item => `
+                <div class="cart-item">
+                    <div>
+                        <strong>${item.product.name}</strong><br>
+                        <small>$${item.product.price.toFixed(2)} x ${item.quantity}</small>
+                    </div>
+                    <div>
+                        <strong>$${item.subtotal.toFixed(2)}</strong>
+                        <button class="remove-btn" onclick="removeFromCart(${item.product.id})">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function checkout() {
+            const res = await fetch('/api/checkout', { method: 'POST' });
+            const data = await res.json();
+            const toast = document.getElementById('toast');
+            toast.innerText = `✅ ${data.message} Order ID: ${data.orderId}`;
+            toast.style.display = 'block';
+            loadCart();
+            setTimeout(() => { toast.style.display = 'none'; }, 5000);
+        }
+
+        loadProducts();
+        loadCart();
+    </script>
+</body>
+</html>
